@@ -1,0 +1,7 @@
+node_modules/
+out*.ndjson
+*.enc
+*.log
+package.json
+package-lock.json
+cloud_mine.js

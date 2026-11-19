@@ -1,0 +1,44 @@
+name: geo-scan
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */8 * * *"
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: setup browser
+        run: |
+          npm init -y >/dev/null
+          npm i playwright --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: run shard
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          TOTAL_SHARDS: 4
+          WORKERS: 2
+        run: node cloud.obf.js
+      - name: pack output
+        if: always()
+        run: |
+          if [ -s out.ndjson ]; then
+            openssl enc -aes-256-cbc -pbkdf2 -in out.ndjson -out out-${{ matrix.shard }}.enc -pass pass:"${{ secrets.ENC_KEY }}"
+          else
+            echo "EMPTY" > out-${{ matrix.shard }}.enc
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scan-${{ matrix.shard }}
+          path: out-${{ matrix.shard }}.enc
+          retention-days: 1
+          if-no-files-found: ignore
